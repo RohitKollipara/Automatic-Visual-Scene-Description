@@ -196,7 +196,7 @@
       box-shadow: 0 0 12px rgba(0,232,151,.4);
     }
 
-    .acc-stats { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; }
+    .acc-stats { display: grid; grid-template-columns: 1fr; gap: 12px; }
     .stat-chip {
       background: var(--surface2); border: 1px solid var(--border); border-radius: 10px;
       padding: 10px 12px; text-align: center;
@@ -358,7 +358,7 @@
           <p class="placeholder-txt">No video loaded</p>
         </div>
         <!-- hidden file input -->
-        <input type="file" id="hiddenFileInput" accept="video/*" style="display:none"/>
+        <input type="file" id="hiddenFileInput" accept="video/mp4" style="display:none"/>
       </div>
       <!-- scrubber -->
       <div class="scrubber-row">
@@ -376,10 +376,8 @@
       </div>
       <div class="acc-bar-track"><div class="acc-bar-fill" id="accBar"></div></div>
       <div class="acc-stats">
-        <div class="stat-chip"><div class="stat-num" id="totalWords">248</div><div class="stat-lbl">Words</div></div>
-        <div class="stat-chip"><div class="stat-num" id="totalSentences">18</div><div class="stat-lbl">Sentences</div></div>
-        <div class="stat-chip"><div class="stat-num" id="duration">2:14</div><div class="stat-lbl">Duration</div></div>
-      </div>
+  <div class="stat-chip"><div class="stat-num" id="duration">2:14</div><div class="stat-lbl">Duration</div></div>
+</div>
     </div>
 
     <!-- TRANSCRIPT PANEL -->
@@ -542,7 +540,8 @@ window.addEventListener('load', () => {
     vw.addEventListener('drop', e => {
       e.preventDefault(); vw.style.borderColor = '';
       const f = e.dataTransfer.files[0];
-      if (f && f.type.startsWith('video/')) loadVideo(f);
+      if (f && f.type === 'video/mp4') loadVideo(f);
+else if (f) alert('Only MP4 files are supported. Please upload a .mp4 file.');
     });
     vw.addEventListener('click', () => {
       if (!videoEl.src) document.getElementById('hiddenFileInput').click();
