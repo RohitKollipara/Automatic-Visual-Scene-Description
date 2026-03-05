@@ -1,0 +1,10 @@
+flask
+moviepy
+openai-whisper
+torch
+gTTS
+numpy
+opencv-python
+pillow
+sentence-transformers
+ffmpeg-python
