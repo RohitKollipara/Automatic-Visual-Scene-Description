@@ -1,5 +1,7 @@
 import whisper
-import json
+import noisereduce as nr
+import soundfile as sf
+import numpy as np
 from moviepy import VideoFileClip
 from pathlib import Path
 
@@ -18,11 +20,54 @@ def extract_audio(video_path: str, audio_output: str = "extracted_audio.wav") ->
         return None
 
 
+def denoise_audio(audio_path: str) -> tuple[np.ndarray, int] | None:
+    """
+    Denoise audio using noisereduce.
+    Uses the first 0.5 seconds as a noise profile sample.
+
+    Args:
+        audio_path (str): Path to the audio file
+
+    Returns:
+        tuple: (denoised audio array, sample rate)
+    """
+    try:
+        # Load audio
+        audio_data, sample_rate = sf.read(audio_path)
+
+        # Convert stereo to mono if needed
+        if audio_data.ndim == 2:
+            audio_data = np.mean(audio_data, axis=1)
+
+        print("Denoising audio...")
+
+        # Use first 0.5 seconds as noise profile (usually no speech at start)
+        noise_sample_end = int(sample_rate * 0.5)
+        noise_sample = audio_data[:noise_sample_end]
+
+        # Apply noise reduction
+        denoised = nr.reduce_noise(
+            y=audio_data,
+            sr=sample_rate,
+            y_noise=noise_sample,   # reference noise profile
+            prop_decrease=0.5,      # how aggressively to reduce noise (0-1)
+            stationary=False        # non-stationary for crowd noise
+        )
+
+        print("Denoising complete.")
+        return denoised, sample_rate
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return None
+
+
 def transcribe_video(video_file: str, model_size: str = "base",
                      output_dir: str = "transcription_output") -> dict | None:
     """
-    Extract audio from video and transcribe it using Whisper.
-    Saves plain text, timestamped transcript, and JSON to output directory.
+    Extract audio from video, denoise it, and transcribe using Whisper.
+    Saves plain text and timestamped transcript to output directory.
 
     Args:
         video_file (str): Path to the video file
@@ -30,7 +75,7 @@ def transcribe_video(video_file: str, model_size: str = "base",
         output_dir (str): Directory to save transcription files
 
     Returns:
-        dict: Contains plain text, segments with timestamps
+        dict: Contains plain text and segments with timestamps
     """
     try:
         video_path = Path(video_file)
@@ -48,52 +93,60 @@ def transcribe_video(video_file: str, model_size: str = "base",
         if not extracted:
             return None
 
-        # Step 2: Transcribe with Whisper
+        # Step 2: Denoise the extracted audio
+        denoised_result = denoise_audio(str(audio_path))
+        if denoised_result is None:
+            print("Denoising failed, using original audio...")
+            denoised_path = audio_path
+        else:
+            denoised_audio, sample_rate = denoised_result
+
+            # Save denoised audio to a separate file
+            denoised_path = output / "denoised_audio.wav"
+            sf.write(str(denoised_path), denoised_audio, sample_rate)
+            print(f"Denoised audio saved to: {denoised_path}")
+
+        # Step 3: Transcribe denoised audio with Whisper
         print(f"Loading Whisper model ({model_size})...")
         model = whisper.load_model(model_size)
 
         print("Transcribing... this may take a moment.")
         result = model.transcribe(
-            str(audio_path),
+            str(denoised_path),
             language="en",
             fp16=False,
             verbose=False,
             word_timestamps=False
         )
 
-        # Step 3: Build structured transcription
+        # Step 4: Build structured transcription
         segments = []
         for seg in result["segments"]:
             segments.append({
                 "start": round(seg["start"], 2),
-                "end":   round(seg["end"], 2),
+                "end":   round(seg["end"],   2),
                 "text":  seg["text"].strip()
             })
 
         plain_text = " ".join(s["text"] for s in segments)
 
-        # Step 4: Save plain text
+        # Step 5: Save plain text
         plain_path = output / "transcription_plain.txt"
         plain_path.write_text(plain_text, encoding="utf-8")
-        print(f"Plain text saved to: {plain_path}")
+        print(f"Plain text saved to:          {plain_path}")
 
-        # Step 5: Save timestamped transcript (readable)
+        # Step 6: Save timestamped transcript
         timestamped_path = output / "transcription_timestamped.txt"
         with timestamped_path.open("w", encoding="utf-8") as f:
             for seg in segments:
                 start = format_time(seg["start"])
                 end   = format_time(seg["end"])
                 f.write(f"[{start} --> {end}]  {seg['text']}\n")
-        print(f"Timestamped transcript saved to: {timestamped_path}")
-
-        # Step 6: Save full JSON (for Gen AI pipeline use)
-        json_path = output / "transcription_full.json"
-        json_path.write_text(json.dumps(segments, indent=2), encoding="utf-8")
-        print(f"Full JSON saved to: {json_path}")
+        print(f"Timestamped transcript saved: {timestamped_path}")
 
         return {
             "plain_text": plain_text,
-            "segments": segments
+            "segments":   segments
         }
 
     except Exception as e:
@@ -111,14 +164,5 @@ def format_time(seconds: float) -> str:
 
 
 if __name__ == "__main__":
-    video_file ="D:\\Hackathon\\videos\cricket144.mp4"
+    video_file = "D:\\Hackathon\\videos\cricket144.mp4"
     transcribe_video(video_file, model_size="base")
-# ```
-
-# **This produces 3 output files in `transcription_output/`:**
-
-# - `transcription_plain.txt` — clean text for Gen AI input
-# - `transcription_timestamped.txt` — readable segments like:
-# ```
-#   [00:00:03 --> 00:00:07]  The batsman takes his stance at the crease.
-#   [00:00:07 --> 00:00:11]  He drives it through the covers for four!
