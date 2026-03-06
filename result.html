@@ -58,16 +58,18 @@
       -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
 
     /* stat strip */
-    .stat-strip { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:20px; animation:fadeUp .6s .1s ease both; }
+    .stat-strip { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:20px; animation:fadeUp .6s .1s ease both; }
     .stat-card { background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:16px 18px; display:flex; flex-direction:column; gap:4px; transition:border-color .2s; }
     .stat-card:hover { border-color:var(--border-hi); }
     .s-label { font-size:10px; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); }
     .s-value { font-family:'Bebas Neue',sans-serif; font-size:30px; line-height:1; color:var(--text); }
     .s-value.green { color:var(--green); text-shadow:0 0 20px rgba(0,232,151,.25); }
     .s-value.blue  { color:var(--accent); text-shadow:0 0 20px rgba(0,220,255,.25); }
+    .s-value.purple{ color:var(--purple); text-shadow:0 0 20px rgba(167,139,250,.25); }
     .s-sub { font-size:11px; color:var(--muted); margin-top:2px; }
     .acc-track { width:100%; height:4px; background:var(--surface2); border-radius:4px; overflow:hidden; margin-top:8px; }
     .acc-fill { height:100%; width:0%; background:linear-gradient(90deg,var(--accent2),var(--green)); border-radius:4px; transition:width 1.6s cubic-bezier(.22,1,.36,1); }
+    .sem-fill { height:100%; width:0%; background:linear-gradient(90deg,var(--purple),var(--accent)); border-radius:4px; transition:width 1.6s .3s cubic-bezier(.22,1,.36,1); }
 
     /* top grid */
     .top-grid { display:grid; grid-template-columns:400px 1fr; gap:20px; margin-bottom:20px; animation:fadeUp .6s .2s ease both; }
@@ -205,6 +207,12 @@
       <span class="s-label">Segments</span>
       <span class="s-value" id="segCount">—</span>
       <span class="s-sub">time segments</span>
+    </div>
+    <div class="stat-card">
+      <span class="s-label">Semantic Score</span>
+      <span class="s-value purple" id="semDisplay">—</span>
+      <div class="acc-track"><div class="sem-fill" id="semBar"></div></div>
+      <span class="s-sub" id="semSub">TF-IDF similarity</span>
     </div>
 
   </div>
@@ -377,6 +385,18 @@ window.addEventListener('load', () => {
   const acc = calcAccuracy(allSegments);
   document.getElementById('accDisplay').textContent = acc + '%';
   setTimeout(() => { document.getElementById('accBar').style.width = acc + '%'; }, 500);
+
+  // Semantic score — comes from backend via sessionStorage
+  const semRaw = sessionStorage.getItem('semanticScore');
+  if (semRaw !== null) {
+    const sem = parseFloat(semRaw);
+    document.getElementById('semDisplay').textContent = sem.toFixed(1) + '%';
+    document.getElementById('semSub').textContent = sem >= 80 ? 'Excellent match' : sem >= 60 ? 'Good match' : sem >= 40 ? 'Moderate match' : 'Low match';
+    setTimeout(() => { document.getElementById('semBar').style.width = Math.min(sem, 100) + '%'; }, 700);
+  } else {
+    document.getElementById('semDisplay').textContent = 'N/A';
+    document.getElementById('semSub').textContent = 'Run merge first';
+  }
 
   /* build segment pills */
   const segList = document.getElementById('segList');
