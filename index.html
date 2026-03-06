@@ -484,6 +484,13 @@ btnSubmit.addEventListener("click", async () => {
 
     sessionStorage.setItem("transcript", JSON.stringify(transcript));
 
+    // Store semantic score if backend returned one
+    if (data.semantic_score !== null && data.semantic_score !== undefined) {
+      sessionStorage.setItem("semanticScore", data.semantic_score);
+    } else {
+      sessionStorage.removeItem("semanticScore");
+    }
+
     const reader = new FileReader();
 
     reader.onload = () => {
